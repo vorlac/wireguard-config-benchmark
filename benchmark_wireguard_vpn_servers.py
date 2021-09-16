@@ -3,6 +3,7 @@ import os
 import requests
 import sys
 import time
+import platform
 
 # directory containing all wireguard configs
 VPN_CONFIG_DIR = "./mullvad_configs"
@@ -10,6 +11,32 @@ VPN_CONFIG_DIR = "./mullvad_configs"
 BENCHMARK_RESULTS_FILE = "./benchmark_results.json"
 # text log file that stdout is piped to
 BENCHMARK_STDOUT_FILE = "./benchmark_stdout.txt"
+
+
+class WireguardClient:
+    PLATFORM_OS = platform.system()
+    if PLATFORM_OS == "Windows":
+        WIREGUARD_UP_COMMAND = "wireguard.exe /installtunnelservice {config_path}"
+        WIREGUARD_DOWN_COMMAND = "wireguard.exe /uninstalltunnelservice {config_name}"
+    elif PLATFORM_OS == "Linux":
+        # TODO add --verbose mode when proper args are added to avoid suppressing wg-quick outout
+        WIREGUARD_UP_COMMAND = "wg-quick up {config_path} >/dev/null 2>&1"
+        WIREGUARD_DOWN_COMMAND = "wg-quick down {config_path} >/dev/null 2>&1"
+    else:
+        raise Exception(f"Unsupported platform: {PLATFORM_OS}")
+
+    @staticmethod
+    def up(config_path):
+        os.system(f"{WireguardClient.WIREGUARD_UP_COMMAND.format(config_path=config_path)}")
+
+    @staticmethod
+    def down(config_path):
+        if WireguardClient.PLATFORM_OS == "Windows":
+            config_basename = os.path.basename(config_path)
+            config_name, _ = os.path.splitext(config_basename)
+            os.system(f"{WireguardClient.WIREGUARD_DOWN_COMMAND.format(config_name=config_name)}")
+        else:
+            os.system(f"{WireguardClient.WIREGUARD_DOWN_COMMAND.format(config_path=config_path)}")
 
 
 class StdOutLogger:
@@ -122,7 +149,7 @@ class ConnectionInfo:
     def speedtest(self) -> None:
         def get_local_speedtest_servers() -> list:
             server_list = []
-            server_listing_output = os.popen("speedtest-cli.exe --list").read()
+            server_listing_output = os.popen("speedtest-cli --list").read()
             for server_listing_line in server_listing_output.splitlines():
                 server_info = server_listing_line.split(")", 1)
                 if len(server_info) == 2:
@@ -140,7 +167,7 @@ class ConnectionInfo:
         self.speedtest_results = []
         for server_id, server_name in speedtest_servers:
             print(f"     > Speed testing server {server_id}: {server_name}")
-            speedtest_output = os.popen(f"speedtest-cli.exe --no-upload --json --server {server_id}").read()
+            speedtest_output = os.popen(f"speedtest-cli --no-upload --json --server {server_id}").read()
             speedtest_json = json.loads(speedtest_output) if speedtest_output.strip() else {}
             result = SpeedTestResult(server_name, speedtest_json)
             print(f"       - Download: {result.download} Mbps, Upload: {result.upload} Mbps, Ping: {result.ping} ms")
@@ -157,7 +184,7 @@ def benchmark_config(config_idx, config_path, base_name):
         time.sleep(5)
 
     try:
-        os.system(f"wireguard.exe /installtunnelservice {config_path}")
+        WireguardClient.up(config_path)
         wait_until_tunnel_established()
         connection_info = ConnectionInfo(config_idx, base_name)
         connection_info.speedtest()
@@ -165,7 +192,7 @@ def benchmark_config(config_idx, config_path, base_name):
     except:
         raise
     finally:
-        os.system(f"wireguard.exe /uninstalltunnelservice {base_name}")
+        WireguardClient.down(config_path)
 
 
 def benchmark_vpn_servers():
@@ -174,11 +201,15 @@ def benchmark_vpn_servers():
     if os.path.exists(BENCHMARK_RESULTS_FILE):
         os.remove(BENCHMARK_RESULTS_FILE)
 
+    print(f"Scanning config dir for wireguard config files: {VPN_CONFIG_DIR}")
+
     config_files = [
         os.path.abspath(os.path.join(VPN_CONFIG_DIR, config_file))
         for config_file in os.listdir(VPN_CONFIG_DIR)
         if os.path.isfile(os.path.join(VPN_CONFIG_DIR, config_file))
     ]
+
+    print(f"> Found {len(config_files)} configs to benchmark")
 
     for idx, config_path in enumerate(config_files):
         file_name = os.path.basename(config_path)
