@@ -2,18 +2,10 @@
 
 ## Setup
 
-1. Install Wireguard, along with any additional dependencies:
-   * Windows: https://www.wireguard.com/install/
-   * Linux (arch specifically for these commands, but any package manager should work for most of these packages):
-        ```bash
-        sudo pacman -S wireguard wireguard-tools openresolv
-        ```
-2. Install Puthon 3.x:
-    * Windows: https://www.python.org/downloads/
-    * Linux (arch specific here again, for other distros you might need to install `python3` or `python3.9` packages explicitly): 
-        ```bash
-        sudo pacman -S python python-pip
-        ```
+1. Install Wireguard, along with any additional dependencies
+   * https://www.wireguard.com/install/
+2. Install Puthon 3.x
+    * https://www.python.org/downloads/
 3. Run the following command to install all python package script dependencies
    ```bash 
    pip install -r requirements.txt
@@ -21,17 +13,12 @@
 4. Generate wireguard config files from your VPN provider
     * Mullvad example:  https://mullvad.net/en/account/#/wireguard-config/?platform=windows
 
-
 ## How to run the benchmark script
 1. Open `benchmark_wireguard_vpn_servers.py` and edit the `VPN_CONFIG_DIR` variable defined at the top to point to the directory containing all wireguard config files.
-2. Run the script as admin (WireGuard client requires admin privileges):
-    * Windows - Run the following command in a command prompt / powershell terminal **as administrator**: 
+2. Run the script:
+    * Windows note: admin privelages are required in order to make calls to the wireguard client from within the script 
         ```bash
         python benchmark_wireguard_vpn_servers.py
-        ```
-    * Linux - Run the following command in your shell of choice:
-        ```bash
-        sudo python benchmark_wireguard_vpn_servers.py
         ```
     The script will pipe all stdout output to a file named `benchmark_stdout.txt`
     
